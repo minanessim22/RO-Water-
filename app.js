@@ -207,7 +207,6 @@ function setView(v){
 $("calcBtn").onclick=()=>setView("calc");
 $("calcBack").onclick=()=>setView("main");
 ["cFeed","cRo","cTar","cVol"].forEach(id=>$(id).oninput=calc);
-document.getElementById("expAll").onclick=()=>exportXlsx(null);
 async function saveFile(name,blob){
  let dl=null;try{dl=await claude.use("downloads")}catch(e){}
  if(dl){try{await dl.save({filename:name,data:blob})}catch(e){}return}
