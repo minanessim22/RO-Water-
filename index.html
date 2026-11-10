@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>محطة مصنع بانوراما — Shift Log</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a5d94">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=5">
+</head>
+<body>
+<header class="top"><div class="brand"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="rgba(255,255,255,.2)"/><path d="M24 9c5 7 10 12 10 18a10 10 0 0 1-20 0c0-6 5-11 10-18z" fill="#fff"/><path d="M19 28a5 5 0 0 0 5 5" stroke="#0b7fbf" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg><div><h1 dir="rtl">محطة مصنع بانوراما</h1><div class="sub2">Panorama Factory Station · Shift Log</div></div></div><div class="who" id="who" hidden><span class="badge" id="roleBadge"></span><a href="#" id="logout">Log out</a></div></header>
+
+<div id="boot" class="card msg">Loading… If this message stays, refresh the page (or open it in a private tab).</div>
+<div id="loginView" hidden>
+ <div class="card login">
+  <div class="lg"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="#0b7fbf"/><path d="M24 9c5 7 10 12 10 18a10 10 0 0 1-20 0c0-6 5-11 10-18z" fill="#fff"/><path d="M19 28a5 5 0 0 0 5 5" stroke="#0b7fbf" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></div>
+  <h2>Sign in</h2><div class="msg">Use the account given to you by the administrator</div>
+  <label>Email</label><input id="em" type="email" autocomplete="username">
+  <label>Password</label><input id="pw" type="password" autocomplete="current-password">
+  <button class="main" id="loginBtn">Sign in</button>
+  <div class="msg err" id="loginErr"></div>
+ </div>
+</div>
+<div id="appView" hidden>
+<div class="sub"><span class="dot" id="dot"></span><span id="conn">Connecting…</span></div>
+<div id="mainView">
+<div class="colA">
+<div class="card"><div class="grid" id="status"></div></div>
+<div class="right gap"><button class="sec" id="limBtn" hidden>TDS limits</button> <button class="sec" id="calcBtn" hidden>Blend calculator</button></div>
+<div class="card"><div class="hrow"><label class="first">History — choose a day</label><button class="sec" id="xlBtn">⬇ Excel</button></div><div class="row center"><button class="sec nogrow" id="dOlder" title="Older day">◀</button><select id="daySel"></select><button class="sec nogrow" id="dNewer" title="Newer day">▶</button></div></div>
+
+</div>
+<div class="colB">
+<div class="card" id="formCard" hidden>
+  <div class="chips" id="chips"></div>
+  <div id="fields"></div>
+  <label>Time (Cairo)</label>
+  <input type="datetime-local" id="when">
+  <button class="main" id="add">Add entry</button>
+  <button class="sec wide" id="cancel" hidden>Cancel edit</button>
+  <div class="msg err" id="formErr"></div>
+</div>
+
+<div class="card" id="chartCard"><div class="hrow"><b>TDS trend</b><span class="msg" id="chartSub"></span></div><div id="chart"></div><div class="legend" id="legend"></div></div>
+<div id="log"></div>
+<div class="foot">محطة مصنع بانوراما · Panorama Factory Station</div>
+</div>
+
+</div>
+<div id="calcView" hidden>
+ <div class="card">
+  <b class="calc-title">Blend calculator</b>
+  <div class="msg tight">Mix RO tank water with Feed tank water to reach a target TDS.</div>
+  <div class="row"><div><label>Feed tank TDS (ppm)</label><input id="cFeed" inputmode="decimal"></div><div><label>RO tank TDS (ppm)</label><input id="cRo" inputmode="decimal"></div></div>
+  <label>Target TDS (ppm)</label><input id="cTar" inputmode="decimal">
+  <div class="msg" id="cHint"></div>
+ </div>
+ <div class="card"><b>1) Ratio (RO : Feed)</b><div class="big" id="cRatio">—</div><div class="msg" id="cRatioSub"></div></div>
+ <div class="card"><b>2) Volumes</b>
+  <label>Prep tank volume (L)</label><input id="cVol" inputmode="decimal" value="4000">
+  <div class="big" id="cLiters">—</div><div class="msg" id="cLitersSub"></div></div>
+ <button class="main ghost" id="calcBack">← Back to log</button>
+</div>
+</div>
+<div id="limModal" class="modal" hidden>
+ <div class="sheet">
+  <div class="sheet-h"><b>TDS limits</b><button class="x" id="limClose" title="Close">✕</button></div>
+  <div class="msg">Readings outside these limits turn red. Leave a box empty for no limit.</div>
+  <div id="limRows"></div>
+  <div class="msg err" id="limMsg"></div>
+  <button class="main" id="limGo">Save limits</button>
+ </div>
+</div>
+<div id="xlModal" class="modal" hidden>
+ <div class="sheet">
+  <div class="sheet-h"><b>Download Excel</b><button class="x" id="xlClose" title="Close">✕</button></div>
+  <label class="chk all"><input type="checkbox" id="xlAll"><span>All days</span></label>
+  <div id="xlList" class="xl-list"></div>
+  <div class="msg err" id="xlMsg"></div>
+  <button class="main" id="xlGo">Download</button>
+ </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="app.js?v=5"></script>
+</body>
+</html>
