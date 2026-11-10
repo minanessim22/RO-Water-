@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <header class="top"><div class="brand"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="rgba(255,255,255,.2)"/><path d="M24 9c5 7 10 12 10 18a10 10 0 0 1-20 0c0-6 5-11 10-18z" fill="#fff"/><path d="M19 28a5 5 0 0 0 5 5" stroke="#0b7fbf" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg><div><h1 dir="rtl">محطة مصنع بانوراما</h1><div class="sub2">Panorama Factory Station · Shift Log</div></div></div><div class="who" id="who" hidden><span class="badge" id="roleBadge"></span><a href="#" id="logout">Log out</a></div></header>
@@ -31,7 +31,7 @@
 <div id="mainView">
 <div class="colA">
 <div class="card"><div class="grid" id="status"></div></div>
-<div class="right gap"><button class="sec" id="limBtn" hidden>TDS limits</button> <button class="sec" id="calcBtn" hidden>Blend calculator</button></div>
+<div class="right gap"><button class="sec" id="tsBtn" hidden>My timesheet</button> <button class="sec" id="limBtn" hidden>TDS limits</button> <button class="sec" id="calcBtn" hidden>Blend calculator</button></div>
 <div class="card"><div class="hrow"><label class="first">History — choose a day</label><button class="sec" id="xlBtn">⬇ Excel</button></div><div class="row center"><button class="sec nogrow" id="dOlder" title="Older day">◀</button><select id="daySel"></select><button class="sec nogrow" id="dNewer" title="Newer day">▶</button></div></div>
 
 </div>
@@ -39,7 +39,7 @@
 <div class="card" id="formCard" hidden>
   <div class="chips" id="chips"></div>
   <div id="fields"></div>
-  <label>Time (Cairo)</label>
+  <div class="hrow"><label>Time (Cairo)</label><button class="sec" id="whenNow" type="button">↻ Now</button></div>
   <input type="datetime-local" id="when">
   <button class="main" id="add">Add entry</button>
   <button class="sec wide" id="cancel" hidden>Cancel edit</button>
@@ -66,6 +66,37 @@
   <div class="big" id="cLiters">—</div><div class="msg" id="cLitersSub"></div></div>
  <button class="main ghost" id="calcBack">← Back to log</button>
 </div>
+
+<div id="timeView" hidden>
+ <div class="card">
+  <div class="hrow"><b class="calc-title">My timesheet</b><button class="sec" id="tsBack">← Back to log</button></div>
+  <label>Date</label><input type="date" id="tsDay">
+  <div class="row">
+   <div><label>Arrived</label><div class="inrow"><input type="time" id="tsIn"><button class="sec" id="tsInNow" type="button">Now</button></div></div>
+   <div><label>Left</label><div class="inrow"><input type="time" id="tsOut"><button class="sec" id="tsOutNow" type="button">Now</button></div></div>
+  </div>
+  <div class="row">
+   <div><label>Shift starts</label><input type="time" id="tsSf"></div>
+   <div><label>Shift ends</label><input type="time" id="tsSt"></div>
+  </div>
+  <div class="row">
+   <div><label>Bonus (amount)</label><input id="tsBonus" inputmode="decimal"></div>
+   <div><label>Bonus note</label><input id="tsBN"></div>
+  </div>
+  <label>Note</label><input id="tsNote">
+  <div class="tsres" id="tsRes"></div>
+  <button class="main" id="tsSave">Save day</button>
+  <button class="sec wide" id="tsDel" hidden>Delete this day</button>
+  <div class="msg err" id="tsErr"></div><div class="msg" id="tsOk"></div>
+ </div>
+ <div class="card">
+  <div class="hrow"><button class="sec" id="tsPrev">◀</button><b id="tsMonthLbl"></b><button class="sec" id="tsNext">▶</button><button class="sec" id="tsXl">⬇ Excel</button></div>
+  <div class="msg err" id="tsNet"></div>
+  <div class="tsrow tshead"><div class="d">Day</div><div class="t">In → Out</div><div class="w">Worked</div><div class="b">Bonus</div></div>
+  <div id="tsList"></div>
+  <div class="msg" id="tsTotal"></div>
+ </div>
+</div>
 </div>
 <div id="limModal" class="modal" hidden>
  <div class="sheet">
@@ -86,6 +117,6 @@
  </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

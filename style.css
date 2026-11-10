@@ -98,3 +98,12 @@ label.first{margin-top:0}
 .legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.8rem;color:var(--tx);margin-top:.4rem}
 .legend i{display:inline-block;width:.7rem;height:.7rem;border-radius:50%;margin-inline-end:.35rem}
 @media (prefers-color-scheme:dark){.bad,.flag{color:#f87171}}
+
+/* timesheet (private) */
+.inrow{display:flex;gap:.4rem}.inrow input{flex:1;min-width:0}
+.tsres{margin:.7rem 0;padding:.65rem .85rem;border-radius:.7rem;background:var(--bg);font-size:.9rem;line-height:1.7;min-height:1rem}
+.tsrow{display:grid;grid-template-columns:1.3fr 1.5fr 1fr .8fr;gap:.4rem;padding:.6rem .2rem;border-bottom:1px solid var(--bd);font-size:.85rem;cursor:pointer;align-items:center}
+.tsrow.tshead{font-weight:700;color:var(--mut);font-size:.72rem;text-transform:uppercase;cursor:default}
+.tsrow .w{font-weight:600}
+.tsrow .b{color:var(--ok);font-weight:700;text-align:end}
+@media (min-width:900px){#timeView{max-width:42rem;margin-inline:auto}}

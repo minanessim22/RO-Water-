@@ -51,6 +51,7 @@ function connText(online){
 async function load(){
  try{
   await syncQueue();
+  if(isMe())await tsSync();
   const res=await Promise.all([api("GET","log?select=*&order=ts.asc"),api("GET","app_settings?select=value&key=eq.limits").catch(()=>null)]);
   serverRows=res[0];
   if(res[1])limits=(res[1][0]&&res[1][0].value)||{};
@@ -72,7 +73,7 @@ const TYPES={
  rt:{label:"RO Tank TDS",f:[["v","TDS (ppm)","number"]]},
  nt:{label:"Note",f:[["txt","Note","text"]]}
 };
-let cur="ts", items=[], db=null, canWrite=false, offline=false, editing=null, pend=null, selDay=undefined, serverRows=[], queue=[], limits={}, syncing=false, outConfirm=false;
+let cur="ts", items=[], db=null, canWrite=false, offline=false, editing=null, pend=null, selDay=undefined, serverRows=[], queue=[], limits={}, syncing=false, outConfirm=false, whenTouched=false, tsRows=[], tsMonth="", tsQ={};
 
 function parts(ts,opt){const o={};new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",...opt}).formatToParts(new Date(ts)).forEach(p=>o[p.type]=p.value);return o}
 function tOf(ts){return new Date(ts).toLocaleTimeString("en-US",{timeZone:TZ,hour:"2-digit",minute:"2-digit"})}
@@ -187,7 +188,7 @@ document.getElementById("add").onclick=async()=>{
   }else{
    try{await api("POST","log",entry);await load()}
    catch(e){if(e.net){qAdd(entry);draw()}else throw e}
-   drawForm();document.getElementById("when").value=inputVal(Date.now());
+   drawForm();whenTouched=false;syncWhen(true);
   }
  }catch(e){err.textContent=e.net?"No connection. Editing needs internet.":"Could not save."}
 };
@@ -214,7 +215,7 @@ function startEdit(id){
 function endEdit(){
  editing=null;document.getElementById("add").textContent="Add entry";
  document.getElementById("cancel").hidden=true;drawForm();
- document.getElementById("when").value=inputVal(Date.now());
+ whenTouched=false;syncWhen(true);
 }
 document.getElementById("cancel").onclick=endEdit;
 function dayKeys(){return [...new Set(items.map(e=>dateISO(e.ts)))].sort().reverse()}
@@ -257,7 +258,9 @@ function calc(){
 function lastVal(t){const e=items.filter(x=>x.type===t).sort((a,b)=>b.ts-a.ts)[0];return e&&e.f&&e.f.v!=null?e.f.v:null}
 function setView(v){
  if(v==="calc"&&!canWrite)v="main";
- $("mainView").hidden=v==="calc";$("calcView").hidden=v!=="calc";
+ if(v==="time"&&!isMe())v="main";
+ $("mainView").hidden=v!=="main";$("calcView").hidden=v!=="calc";$("timeView").hidden=v!=="time";
+ if(v==="time"){(async()=>{tsMonth=curMonth();await tsLoad();tsFill(dateISO(Date.now()));scrollTo(0,0)})()}
  if(v==="calc"){
   const fv=lastVal("ft"),rv=lastVal("rt");let used=false;
   if(!$("cFeed").value&&fv!=null){$("cFeed").value=fv;used=true}
@@ -347,6 +350,141 @@ function drawChart(){
  $("legend").innerHTML=S.filter(([k])=>pts[k].length).map(([k,n,c])=>{const e=pts[k][pts[k].length-1];return '<span><i style="background:'+c+'"></i>'+n+": <b>"+e.f.v+"</b> ppm</span>"}).join("");
 }
 if("serviceWorker" in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})});
+function syncWhen(force){
+ if(editing)return;
+ const w=$("when");
+ if(!force&&whenTouched)return;
+ if(!force&&document.activeElement===w)return;
+ const v=inputVal(Date.now());if(w.value!==v)w.value=v;
+}
+const TS_EMAIL="minanessim19@gmail.com";
+function jwt(){try{const p=session.access.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");return JSON.parse(atob(p+"=".repeat((4-p.length%4)%4)))}catch(e){return {}}}
+function isMe(){return !!session&&String(jwt().email||"").toLowerCase()===TS_EMAIL}
+function toMin(t){if(!t)return null;const a=t.split(":");return (+a[0])*60+(+a[1])}
+function spanMin(a,b){const x=toMin(a),y=toMin(b);if(x==null||y==null)return null;let d=y-x;if(d<0)d+=1440;return d}
+function sdiff(a,b){const x=toMin(a),y=toMin(b);if(x==null||y==null)return null;return (((y-x+720)%1440)+1440)%1440-720}
+function hm(m){if(m==null)return "\u2014";const s=m<0?"-":"";m=Math.abs(m);return s+Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
+function tsCalc(r){
+ const w=spanMin(r.check_in,r.check_out),s=spanMin(r.sched_from,r.sched_to);
+ return {w:w,s:s,diff:(w!=null&&s!=null)?w-s:null,late:sdiff(r.sched_from,r.check_in),early:sdiff(r.check_out,r.sched_to)};
+}
+function nowHM(){return inputVal(Date.now()).slice(11)}
+function curMonth(){return dateISO(Date.now()).slice(0,7)}
+function nextMonth(m){let a=m.split("-").map(Number),y=a[0],mo=a[1]+1;if(mo>12){mo=1;y++}return y+"-"+String(mo).padStart(2,"0")}
+function prevMonth(m){let a=m.split("-").map(Number),y=a[0],mo=a[1]-1;if(mo<1){mo=12;y--}return y+"-"+String(mo).padStart(2,"0")}
+function mlabel(m){return new Date(m+"-15T12:00:00Z").toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"})}
+function dlabel(d){return new Date(d+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"})}
+function tsQSave(){try{localStorage.setItem("plantlog_tsq",JSON.stringify(tsQ))}catch(e){}}
+function tsUpsert(rec){return api("POST","timesheet?on_conflict=user_id,day",rec,true,"resolution=merge-duplicates,return=minimal")}
+async function tsSync(){
+ if(!isMe())return;
+ for(const d of Object.keys(tsQ)){
+  try{await tsUpsert(tsQ[d]);delete tsQ[d];tsQSave()}catch(e){if(e.net)break}
+ }
+}
+function tsAll(){
+ const map={};tsRows.forEach(r=>{map[r.day]=r});
+ Object.keys(tsQ).forEach(d=>{if(d.slice(0,7)===tsMonth)map[d]=Object.assign({},tsQ[d],{pending:true})});
+ return Object.values(map).sort((a,b)=>a.day<b.day?-1:1);
+}
+async function tsLoad(){
+ const m=tsMonth;
+ try{
+  await tsSync();
+  tsRows=await api("GET","timesheet?select=*&day=gte."+m+"-01&day=lt."+nextMonth(m)+"-01&order=day.asc");
+  $("tsNet").textContent="";
+ }catch(e){
+  $("tsNet").textContent=e.net?"Offline \u2014 showing saved days only":"Could not load the timesheet. Make sure the timesheet table was created in Supabase.";
+ }
+ tsDraw();
+}
+function tsForm(){return {check_in:$("tsIn").value||null,check_out:$("tsOut").value||null,sched_from:$("tsSf").value||null,sched_to:$("tsSt").value||null}}
+function tsResult(){
+ const c=tsCalc(tsForm()),p=[];
+ if(c.w!=null)p.push("<b>Worked: "+hm(c.w)+"</b>");else if($("tsIn").value&&!$("tsOut").value)p.push("No leaving time yet");
+ if(c.s!=null)p.push("Shift: "+hm(c.s));
+ if(c.diff!=null)p.push(c.diff>=0?"Extra: +"+hm(c.diff):"Short: "+hm(c.diff));
+ if(c.late!=null&&$("tsIn").value)p.push(c.late>0?"Arrived "+hm(c.late)+" late":c.late<0?"Arrived "+hm(-c.late)+" early":"Arrived on time");
+ if(c.early!=null&&$("tsOut").value)p.push(c.early>0?"Left "+hm(c.early)+" before shift end":c.early<0?"Stayed "+hm(-c.early)+" after shift end":"Left at shift end");
+ $("tsRes").innerHTML=p.join("<br>");
+}
+function tsFill(day){
+ const r=tsAll().find(x=>x.day===day)||{};
+ let sc={};try{sc=JSON.parse(localStorage.getItem("plantlog_sched")||"{}")||{}}catch(e){}
+ $("tsDay").value=day;
+ $("tsIn").value=r.check_in||"";$("tsOut").value=r.check_out||"";
+ $("tsSf").value=r.sched_from||sc.from||"";$("tsSt").value=r.sched_to||sc.to||"";
+ $("tsBonus").value=r.bonus!=null?r.bonus:"";$("tsBN").value=r.bonus_note||"";$("tsNote").value=r.note||"";
+ $("tsDel").hidden=!r.day;$("tsErr").textContent="";$("tsOk").textContent="";
+ tsResult();
+}
+function tsDraw(){
+ $("tsMonthLbl").textContent=mlabel(tsMonth);
+ const rows=tsAll();let W=0,S=0,Wd=0,B=0,D=0;
+ const html=rows.map(r=>{
+  const c=tsCalc(r);
+  if(c.w!=null){W+=c.w;D++}
+  if(c.w!=null&&c.s!=null){S+=c.s;Wd+=c.w}
+  if(r.bonus)B+=Number(r.bonus);
+  return '<div class="tsrow" data-day="'+r.day+'"><div class="d">'+dlabel(r.day)+(r.pending?" \u23f3":"")+'</div><div class="t">'+(r.check_in||"\u2014")+" \u2192 "+(r.check_out||"\u2014")+'</div><div class="w">'+hm(c.w)+'</div><div class="b">'+(r.bonus?"+"+r.bonus:"")+'</div></div>';
+ }).join("");
+ $("tsList").innerHTML=html||'<div class="empty">No days recorded in this month</div>';
+ $("tsTotal").innerHTML=rows.length?"<b>"+D+" days \u00b7 "+hm(W)+"</b>"+(S?" \u00b7 shifts "+hm(S)+" \u00b7 difference "+(Wd-S>=0?"+":"")+hm(Wd-S):"")+(B?" \u00b7 bonus "+B:""):"";
+ $("tsList").querySelectorAll(".tsrow").forEach(el=>{el.onclick=()=>tsFill(el.dataset.day)});
+}
+["tsIn","tsOut","tsSf","tsSt"].forEach(id=>{$(id).oninput=tsResult});
+$("tsInNow").onclick=()=>{$("tsIn").value=nowHM();tsResult()};
+$("tsOutNow").onclick=()=>{$("tsOut").value=nowHM();tsResult()};
+$("tsBtn").onclick=()=>setView("time");
+$("tsBack").onclick=()=>setView("main");
+$("tsDay").onchange=async()=>{const d=$("tsDay").value;if(!d)return;if(d.slice(0,7)!==tsMonth){tsMonth=d.slice(0,7);await tsLoad()}tsFill(d)};
+$("tsPrev").onclick=()=>{tsMonth=prevMonth(tsMonth);tsLoad()};
+$("tsNext").onclick=()=>{tsMonth=nextMonth(tsMonth);tsLoad()};
+$("tsSave").onclick=async()=>{
+ const err=$("tsErr"),ok=$("tsOk");err.textContent="";ok.textContent="";
+ const day=$("tsDay").value;if(!day){err.textContent="Pick a date";return}
+ const b=num($("tsBonus").value);
+ const rec={user_id:jwt().sub,day:day,check_in:$("tsIn").value||null,check_out:$("tsOut").value||null,sched_from:$("tsSf").value||null,sched_to:$("tsSt").value||null,bonus:isNaN(b)?null:b,bonus_note:$("tsBN").value.trim()||null,note:$("tsNote").value.trim()||null};
+ try{localStorage.setItem("plantlog_sched",JSON.stringify({from:rec.sched_from,to:rec.sched_to}))}catch(e){}
+ try{await tsUpsert(rec);delete tsQ[day];tsQSave();ok.textContent="Saved \u2713"}
+ catch(e){
+  if(e.net){tsQ[day]=rec;tsQSave();ok.textContent="Saved on this device \u2014 will sync when you are online"}
+  else{err.textContent="Could not save. Make sure the timesheet table was created in Supabase.";return}
+ }
+ tsMonth=day.slice(0,7);await tsLoad();$("tsDel").hidden=!tsAll().some(x=>x.day===day);
+};
+let tsDelT=false;
+$("tsDel").onclick=async()=>{
+ const day=$("tsDay").value;
+ if(!tsDelT){tsDelT=true;$("tsDel").textContent="Tap again to delete";setTimeout(()=>{tsDelT=false;$("tsDel").textContent="Delete this day"},3000);return}
+ tsDelT=false;$("tsDel").textContent="Delete this day";
+ delete tsQ[day];tsQSave();
+ try{await api("DELETE","timesheet?day=eq."+day);await tsLoad();tsFill(day)}
+ catch(e){$("tsErr").textContent=e.net?"No connection. Deleting needs internet.":"Could not delete."}
+};
+$("tsXl").onclick=()=>exportTs();
+async function exportTs(){
+ const rows=tsAll();if(!rows.length)return;
+ let W=0,B=0;
+ const out=rows.map(r=>{
+  const c=tsCalc(r);if(c.w!=null)W+=c.w;if(r.bonus)B+=Number(r.bonus);
+  return {"Date":r.day,"Arrived":r.check_in||"","Left":r.check_out||"","Shift from":r.sched_from||"","Shift to":r.sched_to||"","Worked":c.w!=null?hm(c.w):"","Worked (hours)":c.w!=null?Math.round(c.w/6)/10:"","Shift":c.s!=null?hm(c.s):"","Difference":c.diff!=null?hm(c.diff):"","Bonus":r.bonus!=null?r.bonus:"","Bonus note":r.bonus_note||"","Note":r.note||""};
+ });
+ out.push({"Date":"TOTAL","Arrived":"","Left":"","Shift from":"","Shift to":"","Worked":hm(W),"Worked (hours)":Math.round(W/6)/10,"Shift":"","Difference":"","Bonus":B,"Bonus note":"","Note":""});
+ const base="timesheet-"+tsMonth;
+ if(typeof XLSX!=="undefined"){
+  const ws=XLSX.utils.json_to_sheet(out);
+  ws["!cols"]=Object.keys(out[0]).map(k=>({wch:k==="Note"||k==="Bonus note"?24:14}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Timesheet");
+  const arr=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  await saveFile(base+".xlsx",new Blob([arr],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+ }else{
+  const cols=Object.keys(out[0]);
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const csv=String.fromCharCode(65279)+[cols.map(q).join(",")].concat(out.map(r=>cols.map(c=>q(r[c])).join(","))).join(String.fromCharCode(10));
+  await saveFile(base+".csv",new Blob([csv],{type:"text/csv"}));
+ }
+}
 async function saveFile(name,blob){
  let dl=null;try{dl=await claude.use("downloads")}catch(e){}
  if(dl){try{await dl.save({filename:name,data:blob})}catch(e){}return}
@@ -388,7 +526,8 @@ function applyAuth(){
  canWrite=role==="editor";
  $("formCard").hidden=!canWrite;$("calcBtn").hidden=!canWrite;$("limBtn").hidden=!canWrite;
  $("roleBadge").textContent=canWrite?"Editor":"Viewer";
- if(!canWrite)setView("main");
+ $("tsBtn").hidden=!isMe();
+ if(!canWrite||(!isMe()&&!$("timeView").hidden))setView("main");
  draw();
 }
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
@@ -404,7 +543,14 @@ async function enter(){
 }
 async function init(){
  var bt=document.getElementById("boot");if(bt)bt.hidden=true;
- drawForm();$("when").value=inputVal(Date.now());draw();
+ drawForm();whenTouched=false;syncWhen(true);draw();
+ $("when").addEventListener("input",()=>{whenTouched=true});
+ $("whenNow").onclick=()=>{whenTouched=false;syncWhen(true)};
+ setInterval(()=>syncWhen(),10000);
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden)syncWhen()});
+ window.addEventListener("focus",()=>syncWhen());
+ window.addEventListener("pageshow",()=>syncWhen());
+ try{tsQ=JSON.parse(localStorage.getItem("plantlog_tsq")||"{}")}catch(e){tsQ={}}
  $("loginBtn").onclick=async()=>{
   const er=$("loginErr");er.textContent="";
   try{
