@@ -568,7 +568,6 @@ async function init(){
  var bt=document.getElementById("boot");if(bt)bt.hidden=true;
  drawForm();whenTouched=false;syncWhen(true);draw();
  $("when").addEventListener("input",()=>{whenTouched=true});
- $("whenNow").onclick=()=>{whenTouched=false;syncWhen(true)};
  setInterval(()=>syncWhen(),10000);
  setInterval(()=>{if(viewToday&&selDay!==dateISO(Date.now()))draw()},30000);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)syncWhen()});
