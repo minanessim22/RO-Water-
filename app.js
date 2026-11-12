@@ -74,7 +74,7 @@ const TYPES={
  rt:{label:"RO Tank TDS",f:[["v","TDS (ppm)","number"]]},
  nt:{label:"Note",f:[["txt","Note","text"]]}
 };
-let cur="ts", items=[], db=null, canWrite=false, offline=false, editing=null, pend=null, selDay=undefined, serverRows=[], queue=[], limits={}, syncing=false, outConfirm=false, whenTouched=false, tsRows=[], tsMonth="", tsQ={};
+let cur="ts", items=[], db=null, canWrite=false, offline=false, editing=null, pend=null, selDay=undefined, serverRows=[], queue=[], limits={}, syncing=false, outConfirm=false, whenTouched=false, viewToday=true, tsRows=[], tsMonth="", tsQ={};
 
 function parts(ts,opt){const o={};new Intl.DateTimeFormat("en-US",{timeZone:TZ,hourCycle:"h23",...opt}).formatToParts(new Date(ts)).forEach(p=>o[p.type]=p.value);return o}
 function tOf(ts){return new Date(ts).toLocaleTimeString("en-US",{timeZone:TZ,hour:"2-digit",minute:"2-digit"})}
@@ -132,7 +132,7 @@ function rowHtml(e){
 function drawLog(){
  const el=document.getElementById("log");
  const vis=items.filter(e=>selDay==="all"||dateISO(e.ts)===selDay);
- if(!vis.length){el.innerHTML='<div class="empty">No entries yet</div>';return}
+ if(!vis.length){el.innerHTML='<div class="empty">'+(selDay===dateISO(Date.now())?'No entries today yet':'No entries on this day')+'</div>';return}
  const days={};vis.slice().sort((a,b)=>a.ts-b.ts).forEach(e=>{(days[dayOf(e.ts)]=days[dayOf(e.ts)]||[]).push(e)});
  el.innerHTML=Object.keys(days).reverse().map(d=>`<div class="day"><h2>${d}</h2><button class="sec" data-copy="${d}">Copy for WhatsApp</button></div><div class="card">${days[d].map(rowHtml).join("")}</div>`).join("");
  el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copyDay(b.dataset.copy,b));
@@ -174,7 +174,7 @@ document.getElementById("add").onclick=async()=>{
  if(!wv){err.textContent="Pick a time";return}
  const ts=fromInput(wv);
  const entry={id:uuid(),ts,type:cur,f,msg:build(cur,f,ts)};
- selDay=dateISO(ts);
+ goDay(dateISO(ts));
  try{
   if(editing){
    const ed=editing;
@@ -220,24 +220,31 @@ function endEdit(){
 }
 document.getElementById("cancel").onclick=endEdit;
 function dayKeys(){return [...new Set(items.map(e=>dateISO(e.ts)))].sort().reverse()}
+function goDay(d){viewToday=(d===dateISO(Date.now()));selDay=d;draw()}
 function drawDays(){
- const keys=dayKeys();
- if(selDay===undefined&&keys.length)selDay=keys[0];
- if(selDay!=="all"&&!keys.includes(selDay))selDay=keys[0]||"all";
- const cnt={},lab={};items.forEach(e=>{const k=dateISO(e.ts);cnt[k]=(cnt[k]||0)+1;lab[k]=dayOf(e.ts)});
- const sel=document.getElementById("daySel");
- sel.innerHTML='<option value="all">All days ('+items.length+')</option>'+keys.map(k=>'<option value="'+k+'">'+lab[k]+' ('+cnt[k]+')</option>').join("");
- sel.value=selDay;
+ const today=dateISO(Date.now());
+ if(viewToday)selDay=today;
+ else if(selDay!=="all"&&!dayKeys().includes(selDay)){viewToday=true;selDay=today}
+ let txt;
+ if(selDay==="all")txt="All days ("+items.length+")";
+ else{const n=items.filter(e=>dateISO(e.ts)===selDay).length;const d=items.find(e=>dateISO(e.ts)===selDay);txt=(selDay===today?"Today":(d?dayOf(d.ts):selDay))+" ("+n+")"}
+ $("histLabel").textContent=txt;
 }
-function stepDay(d){
- const keys=dayKeys();if(!keys.length)return;
- let i=keys.indexOf(selDay);
- if(i<0)i=0;else i=Math.min(keys.length-1,Math.max(0,i+d));
- selDay=keys[i];drawDays();drawLog();
+function openHist(){
+ const today=dateISO(Date.now()),cnt={},lab={};
+ items.forEach(e=>{const k=dateISO(e.ts);cnt[k]=(cnt[k]||0)+1;lab[k]=dayOf(e.ts)});
+ const row=(d,l,n)=>'<button class="histrow'+(selDay===d?" active":"")+'" data-day="'+d+'"><span>'+esc(l)+'</span><span class="n">'+n+'</span></button>';
+ let h=row(today,"Today",cnt[today]||0)+row("all","All days",items.length);
+ h+=dayKeys().filter(k=>k!==today).map(k=>row(k,lab[k],cnt[k])).join("");
+ $("histList").innerHTML=h;
+ $("histList").querySelectorAll(".histrow").forEach(b=>{b.onclick=()=>{goDay(b.dataset.day);closeHist()}});
+ $("histModal").hidden=false;
 }
-document.getElementById("daySel").onchange=e=>{selDay=e.target.value;drawLog()};
-document.getElementById("dOlder").onclick=()=>stepDay(1);
-document.getElementById("dNewer").onclick=()=>stepDay(-1);
+function closeHist(){$("histModal").hidden=true}
+document.getElementById("histBtn").onclick=openHist;
+document.getElementById("histClose").onclick=closeHist;
+document.getElementById("histModal").onclick=e=>{if(e.target===document.getElementById("histModal"))closeHist()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeHist()});
 function num(v){v=String(v==null?"":v).replace(/[\u0660-\u0669]/g,d=>"\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669".indexOf(d)).replace(/[\u066b,]/g,".").trim();const n=parseFloat(v);return isFinite(n)?n:NaN}
 const f2=n=>(Math.round(n*100)/100).toLocaleString("en-US",{maximumFractionDigits:2});
 const $=id=>document.getElementById(id);
@@ -563,6 +570,7 @@ async function init(){
  $("when").addEventListener("input",()=>{whenTouched=true});
  $("whenNow").onclick=()=>{whenTouched=false;syncWhen(true)};
  setInterval(()=>syncWhen(),10000);
+ setInterval(()=>{if(viewToday&&selDay!==dateISO(Date.now()))draw()},30000);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)syncWhen()});
  window.addEventListener("focus",()=>syncWhen());
  window.addEventListener("pageshow",()=>syncWhen());
