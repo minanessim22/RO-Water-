@@ -1,4 +1,5 @@
 /* Panorama Factory Station — Shift Log · app logic */
+if(window.top!==window.self){document.documentElement.style.display="none";try{window.top.location=window.self.location}catch(e){}}
 window.addEventListener("error",function(e){var b=document.getElementById("boot");if(b){b.hidden=false;b.className="card msg err";b.textContent="Page error: "+e.message}});
 const TZ="Africa/Cairo";
 const CFG={URL:"https://vzammutcdmznmbmpguxt.supabase.co",KEY:"sb_publishable_8Hyhyge9UVkPByP6tD_Xcg_UL7DPVTZ"};
@@ -31,7 +32,7 @@ function merge(){
  items=serverRows.filter(r=>!ids.has(r.id)).concat(queue.map(q=>({id:q.id,ts:q.ts,type:q.type,f:q.f,msg:q.msg,pending:true})));
 }
 function qAdd(entry){queue.push({id:entry.id,ts:entry.ts,type:entry.type,f:entry.f,msg:entry.msg});qSave();merge();setConn(false,connText(false))}
-function writeCache(){try{localStorage.setItem("plantlog_cache",JSON.stringify({role:role,rows:serverRows,limits:limits}))}catch(e){}}
+function writeCache(){try{localStorage.setItem("plantlog_cache",JSON.stringify({role:role,rows:serverRows,limits:limits,ts:hasTs}))}catch(e){}}
 function readCache(){try{return JSON.parse(localStorage.getItem("plantlog_cache")||"null")}catch(e){return null}}
 async function syncQueue(){
  if(!queue.length||!session||syncing)return;
@@ -106,7 +107,7 @@ function drawStatus(){
  const roOn=ro&&ro.type==="rs",trOn=tr&&tr.type==="ts";
  const lc=(t,e)=>{const L=limits[t];if(!e||!L||(L.min==null&&L.max==null))return "";return lim(t,e.f.v)?"bad":"on"};
  const ls=(t,e)=>{const r=e?lim(t,e.f.v):null;return r?(r.k==="high"?" · above max":" · below min"):""};
- const card=(h,v,cls,s)=>`<div class="st"><b>${h}</b><span class="${cls}">${v}</span><small>${s}</small></div>`;
+ const card=(h,v,cls,s)=>`<div class="st"><b>${h}</b><span class="${cls}">${esc(v)}</span><small>${esc(s)}</small></div>`;
  document.getElementById("status").innerHTML=
   card("RO system",ro?(roOn?"Running":"Stopped"):"—",roOn?"on":"offc",ro?`since ${tOf(ro.ts)}${roOn&&ro.f.l!=null?` · LTDS ${ro.f.l}`:""}`:"no data")+
   card("Transfer",tr?(trOn?"In progress":"Idle"):"—",trOn?"on":"offc",tr?`since ${tOf(tr.ts)}${trOn&&tr.f.vol?` · ${fmt(tr.f.vol)} L`:""}`:"no data")+
@@ -125,8 +126,8 @@ function rowHtml(e){
  const fl=limFlag(e),meta=[];
  if(e.pending)meta.push("\u23f3 Waiting to sync");
  else{if(e.created_by)meta.push("by "+who(e.created_by));if(e.edited_by)meta.push("edited by "+who(e.edited_by))}
- const btns=canWrite?`<button class="x" data-edit="${e.id}" title="Edit">\u270e</button><button class="x" data-del="${e.id}" title="Delete">\u2715</button>`:"";
- return `<div class="ev${e.pending?" pending":""}${fl?" out":""}"><time>${tOf(e.ts)}</time><p>${esc(e.msg)}${fl?` <span class="flag">\u26a0 ${fl}</span>`:""}${meta.length?`<small class="meta">${esc(meta.join(" \u00b7 "))}</small>`:""}</p>${btns}</div>`;
+ const btns=canWrite?`<button class="x" data-edit="${esc(e.id)}" title="Edit">\u270e</button><button class="x" data-del="${esc(e.id)}" title="Delete">\u2715</button>`:"";
+ return `<div class="ev${e.pending?" pending":""}${fl?" out":""}"><time>${tOf(e.ts)}</time><p>${esc(e.msg)}${fl?` <span class="flag">\u26a0 ${esc(fl)}</span>`:""}${meta.length?`<small class="meta">${esc(meta.join(" \u00b7 "))}</small>`:""}</p>${btns}</div>`;
 }
 function drawLog(){
  const el=document.getElementById("log");
@@ -156,7 +157,7 @@ async function del(id,btn){
  pend=null;
  const e=items.find(x=>x.id===id);
  if(e&&e.pending){queue=queue.filter(x=>x.id!==id);qSave();merge();draw();return}
- try{await api("DELETE","log?id=eq."+id);await load()}
+ try{await api("DELETE","log?id=eq."+encodeURIComponent(id));await load()}
  catch(er){document.getElementById("formErr").textContent=er.net?"No connection. Deleting needs internet.":"Could not delete."}
 }
 
@@ -179,7 +180,7 @@ document.getElementById("add").onclick=async()=>{
    const ed=editing;
    if(ed.pending){const q=queue.find(x=>x.id===ed.id);if(q){q.ts=ts;q.type=cur;q.f=f;q.msg=entry.msg;qSave()}merge()}
    else{
-    await api("PATCH","log?id=eq."+ed.id,{ts,type:cur,f,msg:entry.msg});
+    await api("PATCH","log?id=eq."+encodeURIComponent(ed.id),{ts,type:cur,f,msg:entry.msg});
     serverRows=serverRows.map(e=>e.id===ed.id?{...e,ts,type:cur,f,msg:entry.msg}:e);merge();
    }
    await recalc();
@@ -200,7 +201,7 @@ async function recalc(){
   if(m===e.msg)continue;
   e.msg=m;
   if(e.pending){const q=queue.find(x=>x.id===e.id);if(q){q.msg=m;qSave()}}
-  else{try{await api("PATCH","log?id=eq."+e.id,{msg:m})}catch(er){if(er.net)break}}
+  else{try{await api("PATCH","log?id=eq."+encodeURIComponent(e.id),{msg:m})}catch(er){if(er.net)break}}
  }
 }
 function startEdit(id){
@@ -301,7 +302,7 @@ $("xlGo").onclick=async()=>{
 ["cFeed","cRo","cTar","cVol"].forEach(id=>$(id).oninput=calc);
 const LKEYS=[["pt","Prep tank"],["ft","Feed tank"],["rt","RO tank"]];
 function openLim(){
- $("limRows").innerHTML=LKEYS.map(([k,n])=>{const L=limits[k]||{};const a=L.min!=null?L.min:"",b=L.max!=null?L.max:"";
+ $("limRows").innerHTML=LKEYS.map(([k,n])=>{const L=limits[k]||{};const nv=x=>(x!=null&&x!==""&&isFinite(Number(x)))?Number(x):"";const a=nv(L.min),b=nv(L.max);
   return '<div class="limrow"><b>'+n+'</b><div class="row"><div><label>Min (ppm)</label><input id="lmin_'+k+'" inputmode="decimal" value="'+a+'"></div><div><label>Max (ppm)</label><input id="lmax_'+k+'" inputmode="decimal" value="'+b+'"></div></div></div>'}).join("");
  $("limMsg").textContent="";$("limModal").hidden=false;
 }
@@ -347,7 +348,7 @@ function drawChart(){
   pts[k].forEach(e=>{const bad=lim(k,e.f.v);s+='<circle cx="'+X(e.ts)+'" cy="'+Y(e.f.v)+'" r="4.5" fill="'+(bad?"#dc2626":c)+'" stroke="#fff" stroke-width="1.5"><title>'+n+": "+e.f.v+" ppm \u2014 "+tOf(e.ts)+'</title></circle>'});
  });
  $("chart").innerHTML='<svg viewBox="0 0 '+W+" "+H+'" class="chart" role="img" aria-label="TDS trend">'+g+s+'</svg>';
- $("legend").innerHTML=S.filter(([k])=>pts[k].length).map(([k,n,c])=>{const e=pts[k][pts[k].length-1];return '<span><i style="background:'+c+'"></i>'+n+": <b>"+e.f.v+"</b> ppm</span>"}).join("");
+ $("legend").innerHTML=S.filter(([k])=>pts[k].length).map(([k,n,c])=>{const e=pts[k][pts[k].length-1];return '<span><i class="dot-'+k+'"></i>'+n+": <b>"+e.f.v+"</b> ppm</span>"}).join("");
 }
 if("serviceWorker" in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})});
 function syncWhen(force){
@@ -357,9 +358,9 @@ function syncWhen(force){
  if(!force&&document.activeElement===w)return;
  const v=inputVal(Date.now());if(w.value!==v)w.value=v;
 }
-const TS_EMAIL="minanessim19@gmail.com";
+let hasTs=false;
 function jwt(){try{const p=session.access.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");return JSON.parse(atob(p+"=".repeat((4-p.length%4)%4)))}catch(e){return {}}}
-function isMe(){return !!session&&String(jwt().email||"").toLowerCase()===TS_EMAIL}
+function isMe(){return !!session&&hasTs}
 function toMin(t){if(!t)return null;const a=t.split(":");return (+a[0])*60+(+a[1])}
 function spanMin(a,b){const x=toMin(a),y=toMin(b);if(x==null||y==null)return null;let d=y-x;if(d<0)d+=1440;return d}
 function sdiff(a,b){const x=toMin(a),y=toMin(b);if(x==null||y==null)return null;return (((y-x+720)%1440)+1440)%1440-720}
@@ -426,7 +427,7 @@ function tsDraw(){
   if(c.w!=null){W+=c.w;D++}
   if(c.w!=null&&c.s!=null){S+=c.s;Wd+=c.w}
   if(r.bonus)B+=Number(r.bonus);
-  return '<div class="tsrow" data-day="'+r.day+'"><div class="d">'+dlabel(r.day)+(r.pending?" \u23f3":"")+'</div><div class="t">'+(r.check_in||"\u2014")+" \u2192 "+(r.check_out||"\u2014")+'</div><div class="w">'+hm(c.w)+'</div><div class="b">'+(r.bonus?"+"+r.bonus:"")+'</div></div>';
+  return '<div class="tsrow" data-day="'+esc(r.day)+'"><div class="d">'+esc(dlabel(r.day))+(r.pending?" \u23f3":"")+'</div><div class="t">'+esc(r.check_in||"\u2014")+" \u2192 "+esc(r.check_out||"\u2014")+'</div><div class="w">'+hm(c.w)+'</div><div class="b">'+(r.bonus?esc("+"+r.bonus):"")+'</div></div>';
  }).join("");
  $("tsList").innerHTML=html||'<div class="empty">No days recorded in this month</div>';
  $("tsTotal").innerHTML=rows.length?"<b>"+D+" days \u00b7 "+hm(W)+"</b>"+(S?" \u00b7 shifts "+hm(S)+" \u00b7 difference "+(Wd-S>=0?"+":"")+hm(Wd-S):"")+(B?" \u00b7 bonus "+B:""):"";
@@ -459,7 +460,7 @@ $("tsDel").onclick=async()=>{
  if(!tsDelT){tsDelT=true;$("tsDel").textContent="Tap again to delete";setTimeout(()=>{tsDelT=false;$("tsDel").textContent="Delete this day"},3000);return}
  tsDelT=false;$("tsDel").textContent="Delete this day";
  delete tsQ[day];tsQSave();
- try{await api("DELETE","timesheet?day=eq."+day);await tsLoad();tsFill(day)}
+ try{await api("DELETE","timesheet?day=eq."+encodeURIComponent(day));await tsLoad();tsFill(day)}
  catch(e){$("tsErr").textContent=e.net?"No connection. Deleting needs internet.":"Could not delete."}
 };
 $("tsXl").onclick=()=>exportTs();
@@ -521,7 +522,16 @@ function setConn(live,txt){document.getElementById("dot").className="dot"+(live?
 
 let pollT=null,role=null;
 function show(v){$("loginView").hidden=v!=="login";$("appView").hidden=v!=="app";$("who").hidden=v!=="app"}
-async function loadRole(){try{const r=await api("GET","user_roles?select=role");role=r&&r[0]?r[0].role:null}catch(e){role=null}}
+async function loadRole(){
+ hasTs=false;
+ try{
+  let r;
+  try{r=await api("GET","user_roles?select=role,timesheet")}
+  catch(e){if(e.net)throw e;r=await api("GET","user_roles?select=role")}
+  role=r&&r[0]?r[0].role:null;
+  hasTs=!!(r&&r[0]&&r[0].timesheet);
+ }catch(e){role=null}
+}
 function applyAuth(){
  canWrite=role==="editor";
  $("formCard").hidden=!canWrite;$("calcBtn").hidden=!canWrite;$("limBtn").hidden=!canWrite;
@@ -532,7 +542,8 @@ function applyAuth(){
 }
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=null}}
 function signOut(msg){
- clearSession();role=null;serverRows=[];limits={};merge();canWrite=false;stopPoll();
+ if(session){try{fetch(CFG.URL+"/auth/v1/logout?scope=local",{method:"POST",headers:{apikey:CFG.KEY,Authorization:"Bearer "+session.access}}).catch(()=>{})}catch(e){}}
+ clearSession();role=null;hasTs=false;serverRows=[];limits={};merge();canWrite=false;stopPoll();
  try{localStorage.removeItem("plantlog_cache")}catch(e){}
  show("login");$("loginErr").textContent=msg||"";
 }
@@ -574,7 +585,7 @@ async function init(){
  if(ok===true){await enter();return}
  if(ok===null){
   const c=readCache();
-  if(c&&c.role){role=c.role;serverRows=c.rows||[];limits=c.limits||{};merge();applyAuth();show("app");setConn(false,connText(false));stopPoll();pollT=setInterval(load,10000);return}
+  if(c&&c.role){role=c.role;hasTs=!!c.ts;serverRows=c.rows||[];limits=c.limits||{};merge();applyAuth();show("app");setConn(false,connText(false));stopPoll();pollT=setInterval(load,10000);return}
   show("login");$("loginErr").textContent="No connection. Try again when you are online.";return;
  }
  clearSession();show("login");

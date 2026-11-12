@@ -107,3 +107,5 @@ label.first{margin-top:0}
 .tsrow .w{font-weight:600}
 .tsrow .b{color:var(--ok);font-weight:700;text-align:end}
 @media (min-width:900px){#timeView{max-width:42rem;margin-inline:auto}}
+
+.dot-pt{background:#0b7fbf}.dot-ft{background:#e07b00}.dot-rt{background:#0fa5a0}
