@@ -375,6 +375,11 @@ function nextMonth(m){let a=m.split("-").map(Number),y=a[0],mo=a[1]+1;if(mo>12){
 function prevMonth(m){let a=m.split("-").map(Number),y=a[0],mo=a[1]-1;if(mo<1){mo=12;y--}return y+"-"+String(mo).padStart(2,"0")}
 function mlabel(m){return new Date(m+"-15T12:00:00Z").toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"})}
 function dlabel(d){return new Date(d+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"})}
+function tsErrText(e,what){
+ let m="";try{const o=JSON.parse(e.message);m=o.message||o.code||""}catch(x){m=String(e.message||"").slice(0,100)}
+ const hint=e.status===404?" \u2014 the timesheet table is missing":(e.status===401||e.status===403)?" \u2014 the permission policy is missing or blocking you":"";
+ return what+" ("+(e.status||"?")+(m?": "+m:"")+")"+hint;
+}
 function tsQSave(){try{localStorage.setItem("plantlog_tsq",JSON.stringify(tsQ))}catch(e){}}
 function tsUpsert(rec){return api("POST","timesheet?on_conflict=user_id,day",rec,true,"resolution=merge-duplicates,return=minimal")}
 async function tsSync(){
@@ -395,7 +400,7 @@ async function tsLoad(){
   tsRows=await api("GET","timesheet?select=*&day=gte."+m+"-01&day=lt."+nextMonth(m)+"-01&order=day.asc");
   $("tsNet").textContent="";
  }catch(e){
-  $("tsNet").textContent=e.net?"Offline \u2014 showing saved days only":"Could not load the timesheet. Make sure the timesheet table was created in Supabase.";
+  $("tsNet").textContent=e.net?"Offline \u2014 showing saved days only":tsErrText(e,"Could not load the timesheet");
  }
  tsDraw();
 }
@@ -450,7 +455,7 @@ $("tsSave").onclick=async()=>{
  try{await tsUpsert(rec);delete tsQ[day];tsQSave();ok.textContent="Saved \u2713"}
  catch(e){
   if(e.net){tsQ[day]=rec;tsQSave();ok.textContent="Saved on this device \u2014 will sync when you are online"}
-  else{err.textContent="Could not save. Make sure the timesheet table was created in Supabase.";return}
+  else{err.textContent=tsErrText(e,"Could not save");return}
  }
  tsMonth=day.slice(0,7);await tsLoad();$("tsDel").hidden=!tsAll().some(x=>x.day===day);
 };
@@ -461,7 +466,7 @@ $("tsDel").onclick=async()=>{
  tsDelT=false;$("tsDel").textContent="Delete this day";
  delete tsQ[day];tsQSave();
  try{await api("DELETE","timesheet?day=eq."+encodeURIComponent(day));await tsLoad();tsFill(day)}
- catch(e){$("tsErr").textContent=e.net?"No connection. Deleting needs internet.":"Could not delete."}
+ catch(e){$("tsErr").textContent=e.net?"No connection. Deleting needs internet.":tsErrText(e,"Could not delete")}
 };
 $("tsXl").onclick=()=>exportTs();
 async function exportTs(){
