@@ -7,12 +7,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>محطة مصنع بانوراما — Shift Log</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0a5d94">
+<meta name="theme-color" content="#071521">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cairo:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 <header class="top"><div class="brand"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="23" fill="rgba(255,255,255,.2)"/><path d="M24 9c5 7 10 12 10 18a10 10 0 0 1-20 0c0-6 5-11 10-18z" fill="#fff"/><path d="M19 28a5 5 0 0 0 5 5" stroke="#0b7fbf" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg><div><h1 dir="rtl">محطة مصنع بانوراما</h1><div class="sub2">Panorama Factory Station · Shift Log</div></div></div><div class="who" id="who" hidden><span class="badge" id="roleBadge"></span><a href="#" id="logout">Log out</a></div></header>
@@ -48,7 +48,14 @@
   <div class="msg err" id="formErr"></div>
 </div>
 
-<div class="card" id="chartCard"><div class="hrow"><b>TDS trend</b><span class="msg" id="chartSub"></span></div><div id="chart"></div><div class="legend" id="legend"></div></div>
+<div class="card" id="chartCard">
+ <div class="hrow"><b class="ctitle">TDS trend</b><div class="seg" id="chartRange"><button type="button" data-r="all">All Days</button><button type="button" data-r="7" class="on">7 Days</button><button type="button" data-r="30">30 Days</button></div></div>
+ <div class="msg tight" id="chartSub"></div>
+ <div id="chart"></div>
+ <div class="chart-tip" id="chartTip">Tap a point to see its value</div>
+ <div class="legend" id="legend"></div>
+ <div class="msg" id="chartNote"></div>
+</div>
 <div id="log"></div>
 <div class="foot">محطة مصنع بانوراما · Panorama Factory Station</div>
 </div>
@@ -100,6 +107,13 @@
  </div>
 </div>
 </div>
+<div id="cfModal" class="modal" hidden>
+ <div class="sheet">
+  <div class="sheet-h"><b id="cfTitle">Confirm</b></div>
+  <div class="cf-body" id="cfBody"></div>
+  <div class="row cf-btns"><button class="sec big-btn" id="cfNo" type="button">Cancel</button><button class="main" id="cfGo" type="button">Confirm</button></div>
+ </div>
+</div>
 <div id="histModal" class="modal" hidden>
  <div class="sheet">
   <div class="sheet-h"><b>History</b><button class="x" id="histClose" title="Close">✕</button></div>
@@ -125,6 +139,6 @@
  </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

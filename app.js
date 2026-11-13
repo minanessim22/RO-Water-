@@ -95,8 +95,20 @@ function build(type,f,ts){
  return f.txt
 }
 
+const ICO={
+ drop:'<svg viewBox="0 0 24 24"><path d="M12 3l6 6.3a8 8 0 1 1-12 0z"/></svg>',
+ flow:'<svg viewBox="0 0 24 24"><path d="M4 8h13m0 0l-4-4m4 4l-4 4M20 16H7m0 0l4-4m-4 4l4 4"/></svg>',
+ tank:'<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v13c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-13"/></svg>',
+ clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+ play:'<svg viewBox="0 0 24 24"><path d="M8 5.5l10 6.5-10 6.5z"/></svg>',
+ stop:'<svg viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></svg>',
+ note:'<svg viewBox="0 0 24 24"><path d="M5 19l1-4 9.5-9.5 3 3L9 18z"/></svg>'
+};
+const GROUPS=[["Transfer",["ts","te"]],["RO system",["rs","rp"]],["Measurements",["pt","ft","rt"]],["Other",["nt"]]];
+const KIND={ts:"start",rs:"start",te:"stop",rp:"stop",pt:"meas",ft:"meas",rt:"meas",nt:"note"};
+const KICO={start:"play",stop:"stop",meas:"drop",note:"note"};
 function drawForm(){
- document.getElementById("chips").innerHTML=Object.entries(TYPES).filter(([k])=>!editing||k===cur).map(([k,t])=>`<button class="chip ${k===cur?"sel":""}" data-k="${k}">${t.label}</button>`).join("");
+ document.getElementById("chips").innerHTML=GROUPS.map(([g,ks])=>{const arr=ks.filter(k=>!editing||k===cur);if(!arr.length)return "";return `<div class="cgrp"><span class="cgl">${g}</span><div class="cgb">${arr.map(k=>`<button type="button" class="chip ${KIND[k]}${k===cur?" sel":""}" data-k="${k}">${TYPES[k].label}</button>`).join("")}</div></div>`}).join("");
  document.getElementById("fields").innerHTML=TYPES[cur].f.map(([id,lb,ty])=>`<label>${lb}</label><input id="f_${id}" type="${ty}" value="${editing&&editing.f&&editing.f[id]!=null?esc(editing.f[id]):""}" ${ty==="number"?'inputmode="decimal" step="any"':""}>`).join("");
  document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{cur=b.dataset.k;drawForm()});
 }
@@ -107,14 +119,14 @@ function drawStatus(){
  const roOn=ro&&ro.type==="rs",trOn=tr&&tr.type==="ts";
  const lc=(t,e)=>{const L=limits[t];if(!e||!L||(L.min==null&&L.max==null))return "";return lim(t,e.f.v)?"bad":"on"};
  const ls=(t,e)=>{const r=e?lim(t,e.f.v):null;return r?(r.k==="high"?" · above max":" · below min"):""};
- const card=(h,v,cls,s)=>`<div class="st"><b>${h}</b><span class="${cls}">${esc(v)}</span><small>${esc(s)}</small></div>`;
+ const card=(h,v,cls,s,ic)=>`<div class="st ${cls}"><div class="st-h"><i class="ico">${ICO[ic]}</i><b>${h}</b><i class="sdot ${cls}"></i></div><span class="${cls}">${esc(v)}</span><small>${esc(s)}</small></div>`;
  document.getElementById("status").innerHTML=
-  card("RO system",ro?(roOn?"Running":"Stopped"):"—",roOn?"on":"offc",ro?`since ${tOf(ro.ts)}${roOn&&ro.f.l!=null?` · LTDS ${ro.f.l}`:""}`:"no data")+
-  card("Transfer",tr?(trOn?"In progress":"Idle"):"—",trOn?"on":"offc",tr?`since ${tOf(tr.ts)}${trOn&&tr.f.vol?` · ${fmt(tr.f.vol)} L`:""}`:"no data")+
-  card("Prep tank",pt?`${pt.f.v} ppm`:"—",lc("pt",pt),pt?`measured ${tOf(pt.ts)}${ls("pt",pt)}`:"no data")+
-  card("Feed tank",ft?`${ft.f.v} ppm`:"—",lc("ft",ft),ft?`measured ${tOf(ft.ts)}${ls("ft",ft)}`:"no data")+
-  card("RO tank",rt?`${rt.f.v} ppm`:"—",lc("rt",rt),rt?`measured ${tOf(rt.ts)}${ls("rt",rt)}`:"no data")+
-  card("Last update",any?tOf(any.ts):"—","",any?dayOf(any.ts):"no data");
+  card("RO system",ro?(roOn?"Running":"Stopped"):"—",roOn?"on":"offc",ro?`since ${tOf(ro.ts)}${roOn&&ro.f.l!=null?` · LTDS ${ro.f.l}`:""}`:"no data","drop")+
+  card("Transfer",tr?(trOn?"In progress":"Idle"):"—",trOn?"on":"offc",tr?`since ${tOf(tr.ts)}${trOn&&tr.f.vol?` · ${fmt(tr.f.vol)} L`:""}`:"no data","flow")+
+  card("Prep tank",pt?`${pt.f.v} ppm`:"—",lc("pt",pt),pt?`measured ${tOf(pt.ts)}${ls("pt",pt)}`:"no data","tank")+
+  card("Feed tank",ft?`${ft.f.v} ppm`:"—",lc("ft",ft),ft?`measured ${tOf(ft.ts)}${ls("ft",ft)}`:"no data","tank")+
+  card("RO tank",rt?`${rt.f.v} ppm`:"—",lc("rt",rt),rt?`measured ${tOf(rt.ts)}${ls("rt",rt)}`:"no data","tank")+
+  card("Last update",any?tOf(any.ts):"—","",any?dayOf(any.ts):"no data","clock");
 }
 
 function limFlag(e){
@@ -123,18 +135,18 @@ function limFlag(e){
 }
 function who(s){return String(s).split("@")[0]}
 function rowHtml(e){
- const fl=limFlag(e),meta=[];
+ const fl=limFlag(e),meta=[],k=KIND[e.type]||"note";
  if(e.pending)meta.push("\u23f3 Waiting to sync");
  else{if(e.created_by)meta.push("by "+who(e.created_by));if(e.edited_by)meta.push("edited by "+who(e.edited_by))}
  const btns=canWrite?`<button class="x" data-edit="${esc(e.id)}" title="Edit">\u270e</button><button class="x" data-del="${esc(e.id)}" title="Delete">\u2715</button>`:"";
- return `<div class="ev${e.pending?" pending":""}${fl?" out":""}"><time>${tOf(e.ts)}</time><p>${esc(e.msg)}${fl?` <span class="flag">\u26a0 ${esc(fl)}</span>`:""}${meta.length?`<small class="meta">${esc(meta.join(" \u00b7 "))}</small>`:""}</p>${btns}</div>`;
+ return `<div class="ev k-${k}${e.pending?" pending":""}${fl?" out":""}"><i class="eico">${ICO[KICO[k]]}</i><div class="ebody"><time>${tOf(e.ts)}</time><p>${esc(e.msg)}${fl?` <span class="flag">\u26a0 ${esc(fl)}</span>`:""}</p>${meta.length?`<small class="meta">${esc(meta.join(" \u00b7 "))}</small>`:""}</div>${btns}</div>`;
 }
 function drawLog(){
  const el=document.getElementById("log");
  const vis=items.filter(e=>selDay==="all"||dateISO(e.ts)===selDay);
  if(!vis.length){el.innerHTML='<div class="empty">'+(selDay===dateISO(Date.now())?'No entries today yet':'No entries on this day')+'</div>';return}
  const days={};vis.slice().sort((a,b)=>a.ts-b.ts).forEach(e=>{(days[dayOf(e.ts)]=days[dayOf(e.ts)]||[]).push(e)});
- el.innerHTML=Object.keys(days).reverse().map(d=>`<div class="day"><h2>${d}</h2><button class="sec" data-copy="${d}">Copy for WhatsApp</button></div><div class="card">${days[d].map(rowHtml).join("")}</div>`).join("");
+ el.innerHTML=Object.keys(days).reverse().map(d=>`<div class="day"><h2>${d}<span class="cnt">${days[d].length}</span></h2><button class="sec" data-copy="${d}">Copy for WhatsApp</button></div><div class="card">${days[d].map(rowHtml).join("")}</div>`).join("");
  el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copyDay(b.dataset.copy,b));
  el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>del(b.dataset.del,b));
  el.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
@@ -174,6 +186,7 @@ document.getElementById("add").onclick=async()=>{
  if(!wv){err.textContent="Pick a time";return}
  const ts=fromInput(wv);
  const entry={id:uuid(),ts,type:cur,f,msg:build(cur,f,ts)};
+ if(!editing&&(KIND[cur]==="start"||KIND[cur]==="stop")&&!(await confirmEntry(entry)))return;
  goDay(dateISO(ts));
  try{
   if(editing){
@@ -329,34 +342,87 @@ $("limGo").onclick=async()=>{
   limits=nl;writeCache();closeLim();draw();
  }catch(e){$("limMsg").textContent=e.net?"No connection.":"Could not save. Make sure the settings table was created in Supabase."}
 };
+function confirmEntry(entry){
+ return new Promise(res=>{
+  const m=document.getElementById("cfModal"),go=document.getElementById("cfGo"),no=document.getElementById("cfNo");
+  document.getElementById("cfTitle").textContent="Confirm "+TYPES[entry.type].label;
+  document.getElementById("cfBody").textContent=tOf(entry.ts)+" \u00b7 "+entry.msg;
+  go.className="main "+KIND[entry.type];
+  const done=v=>{m.hidden=true;go.onclick=no.onclick=m.onclick=null;res(v)};
+  go.onclick=()=>done(true);no.onclick=()=>done(false);
+  m.onclick=e=>{if(e.target===m)done(false)};
+  m.hidden=false;
+ });
+}
+document.addEventListener("keydown",e=>{const m=document.getElementById("cfModal");if(e.key==="Escape"&&m&&!m.hidden)document.getElementById("cfNo").click()});
+let chartRange="7",chartOff={},rzT;
+const TIP0="Tap a point to see its value";
+function dlab(ts){return new Date(ts).toLocaleDateString("en-US",{timeZone:TZ,month:"short",day:"numeric"})+" "+tOf(ts)}
+function robustRange(vals,extra){
+ const v=vals.slice().sort((a,b)=>a-b),n=v.length;
+ let lo=v[0],hi=v[n-1];
+ if(n>=6){
+  const q=p=>v[Math.floor((n-1)*p)],q1=q(.25),q3=q(.75),iqr=Math.max(q3-q1,Math.abs(q3)*0.05,1);
+  const inn=v.filter(x=>x>=q1-3*iqr&&x<=q3+3*iqr);
+  if(inn.length&&inn.length<n){lo=inn[0];hi=inn[inn.length-1]}
+ }
+ extra.forEach(x=>{lo=Math.min(lo,x);hi=Math.max(hi,x)});
+ const minSpan=Math.max(10,hi*0.2);
+ if(hi-lo<minSpan){const mid=(hi+lo)/2;lo=mid-minSpan/2;hi=mid+minSpan/2}
+ const pad=(hi-lo)*0.12;
+ return {lo:Math.max(0,lo-pad),hi:hi+pad};
+}
 function drawChart(){
- const S=[["pt","Prep tank","#0b7fbf"],["ft","Feed tank","#e07b00"],["rt","RO tank","#0fa5a0"]];
- const vis=items.filter(e=>selDay==="all"||dateISO(e.ts)===selDay);
- const pts={};S.forEach(([k])=>{pts[k]=vis.filter(e=>e.type===k&&e.f&&typeof e.f.v==="number").sort((a,b)=>a.ts-b.ts)});
- const all=[].concat(pts.pt,pts.ft,pts.rt);
- $("chartSub").textContent=selDay==="all"?"All days":(vis.length?dayOf(vis[0].ts):"");
- if(all.length<2){$("chart").innerHTML='<div class="empty">Not enough TDS readings to draw a chart</div>';$("legend").innerHTML="";return}
+ const S=[["pt","Prep tank","#19BDEB"],["ft","Feed tank","#F5A524"],["rt","RO tank","#00B8B0"]];
+ const from=chartRange==="all"?0:Date.now()-(+chartRange)*86400000;
+ const pts={};S.forEach(([k])=>{pts[k]=items.filter(e=>e.type===k&&e.f&&typeof e.f.v==="number"&&e.ts>=from).sort((a,b)=>a.ts-b.ts)});
+ $("legend").innerHTML=S.map(([k,n])=>{const a=pts[k],e=a[a.length-1];return '<button type="button" class="lgi'+(chartOff[k]?" off":"")+(a.length?"":" none")+'" data-k="'+k+'"><i class="dot-'+k+'"></i>'+n+(e?" <b>"+e.f.v+"</b> ppm":" <em>no data</em>")+"</button>"}).join("");
+ const vis=S.filter(([k])=>pts[k].length&&!chartOff[k]);
+ const total=vis.reduce((s,[k])=>s+pts[k].length,0);
+ $("chartSub").textContent=(chartRange==="all"?"All days":"Last "+chartRange+" days")+" \u00b7 "+total+(total===1?" reading":" readings");
+ $("chartNote").textContent="";
+ if(total<2){$("chart").innerHTML='<div class="empty">Not enough TDS readings in this range</div>';$("chartTip").hidden=true;return}
+ $("chartTip").hidden=false;
+ const hasLow=vis.some(([k])=>k!=="ft");
+ const grp=k=>(k==="ft"&&hasLow)?"R":"L";
+ const vals={L:[],R:[]},extra={L:[],R:[]};
+ vis.forEach(([k])=>{const g=grp(k);pts[k].forEach(e=>vals[g].push(e.f.v));const L=limits[k]||{};[L.min,L.max].forEach(x=>{if(x!=null&&x!==""&&isFinite(+x))extra[g].push(+x)})});
+ const rg={L:vals.L.length?robustRange(vals.L,extra.L):null,R:vals.R.length?robustRange(vals.R,extra.R):null};
+ const W=Math.max(280,Math.min(760,$("chart").clientWidth||360)),H=Math.round(Math.max(200,Math.min(320,W*0.62)));
+ const l=38,r=rg.R?44:12,t=18,b=26;
+ const all=[].concat(...vis.map(([k])=>pts[k]));
  let t0=Math.min(...all.map(e=>e.ts)),t1=Math.max(...all.map(e=>e.ts));
  if(t1-t0<3600000){t0-=1800000;t1+=1800000}
- let lo=Math.min(...all.map(e=>e.f.v)),hi=Math.max(...all.map(e=>e.f.v));
- S.forEach(([k])=>{const L=limits[k];if(L&&pts[k].length){if(L.min!=null)lo=Math.min(lo,L.min);if(L.max!=null)hi=Math.max(hi,L.max)}});
- const pad=(hi-lo)*0.1||5;lo=Math.max(0,lo-pad);hi=hi+pad;
- const W=360,H=220,l=38,r=10,t=12,b=28;
- const X=ts=>l+(ts-t0)/(t1-t0)*(W-l-r),Y=v=>t+(1-(v-lo)/(hi-lo))*(H-t-b);
- let g="";
- for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,y=Y(v);g+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y+'" y2="'+y+'" class="grid"/><text x="'+(l-5)+'" y="'+(y+4)+'" text-anchor="end">'+Math.round(v)+'</text>'}
+ const X=ts=>l+(ts-t0)/(t1-t0)*(W-l-r);
+ const Y=(g,v)=>{const s=rg[g],c=Math.min(Math.max(v,s.lo),s.hi);return t+(1-(c-s.lo)/(s.hi-s.lo))*(H-t-b)};
+ let g='<text x="2" y="11">ppm</text>';
+ if(rg.R)g+='<text x="'+(W-r+5)+'" y="11" fill="#F5A524" class="ax">Feed</text>';
+ for(let i=0;i<=4;i++){
+  const y=t+(1-i/4)*(H-t-b);
+  g+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y+'" y2="'+y+'" class="grid"/><text x="'+(l-6)+'" y="'+(y+4)+'" text-anchor="end">'+Math.round(rg.L.lo+(rg.L.hi-rg.L.lo)*i/4)+"</text>";
+  if(rg.R)g+='<text x="'+(W-r+5)+'" y="'+(y+4)+'" fill="#F5A524" class="ax">'+Math.round(rg.R.lo+(rg.R.hi-rg.R.lo)*i/4)+"</text>";
+ }
  const span=t1-t0;
- for(let i=0;i<=3;i++){const ts=t0+span*i/3,x=X(ts);const lbl=span<=36*3600000?tOf(ts):new Date(ts).toLocaleDateString("en-US",{timeZone:TZ,month:"short",day:"numeric"});g+='<text x="'+x+'" y="'+(H-8)+'" text-anchor="'+(i===0?"start":i===3?"end":"middle")+'">'+lbl+'</text>'}
- let s="";
- S.forEach(([k,n,c])=>{
-  const L=limits[k];
-  if(L&&pts[k].length){[L.min,L.max].forEach(v=>{if(v!=null)s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="'+c+'" stroke-dasharray="5 4" opacity=".55"/>'})}
-  if(pts[k].length>1)s+='<polyline fill="none" stroke="'+c+'" stroke-width="2.5" points="'+pts[k].map(e=>X(e.ts)+","+Y(e.f.v)).join(" ")+'"/>';
-  pts[k].forEach(e=>{const bad=lim(k,e.f.v);s+='<circle cx="'+X(e.ts)+'" cy="'+Y(e.f.v)+'" r="4.5" fill="'+(bad?"#dc2626":c)+'" stroke="#fff" stroke-width="1.5"><title>'+n+": "+e.f.v+" ppm \u2014 "+tOf(e.ts)+'</title></circle>'});
+ for(let i=0;i<=3;i++){const ts=t0+span*i/3;g+='<text x="'+X(ts)+'" y="'+(H-8)+'" text-anchor="'+(i===0?"start":i===3?"end":"middle")+'">'+(span<=36*3600000?tOf(ts):new Date(ts).toLocaleDateString("en-US",{timeZone:TZ,month:"short",day:"numeric"}))+"</text>"}
+ let s="",ext=0;
+ vis.forEach(([k,n,c])=>{
+  const gr=grp(k),sc=rg[gr],L=limits[k]||{};
+  [L.min,L.max].forEach(x=>{if(x!=null&&x!==""&&isFinite(+x))s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(gr,+x)+'" y2="'+Y(gr,+x)+'" stroke="'+c+'" stroke-dasharray="5 4" opacity=".55"/>'});
+  const inn=pts[k].filter(e=>e.f.v>=sc.lo&&e.f.v<=sc.hi);
+  if(inn.length>1)s+='<polyline fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="'+inn.map(e=>X(e.ts).toFixed(1)+","+Y(gr,e.f.v).toFixed(1)).join(" ")+'"/>';
+  pts[k].forEach(e=>{
+   const out=e.f.v<sc.lo||e.f.v>sc.hi,bad=lim(k,e.f.v),cx=X(e.ts).toFixed(1),cy=Y(gr,e.f.v).toFixed(1),tip=n+" \u00b7 "+e.f.v+" ppm \u00b7 "+dlab(e.ts);
+   if(out)ext++;
+   s+='<circle class="pt-dot'+(out?" xt":"")+'" cx="'+cx+'" cy="'+cy+'" r="'+(out?5.5:4)+'" fill="'+(out?"none":bad?"#FF6B7A":c)+'" stroke="'+(out||bad?"#FF6B7A":"#10283A")+'" stroke-width="'+(out?2:1.5)+'"/><circle class="hit" cx="'+cx+'" cy="'+cy+'" r="13" data-tip="'+esc(tip)+'"><title>'+esc(tip)+"</title></circle>";
+  });
  });
- $("chart").innerHTML='<svg viewBox="0 0 '+W+" "+H+'" class="chart" role="img" aria-label="TDS trend">'+g+s+'</svg>';
- $("legend").innerHTML=S.filter(([k])=>pts[k].length).map(([k,n,c])=>{const e=pts[k][pts[k].length-1];return '<span><i class="dot-'+k+'"></i>'+n+": <b>"+e.f.v+"</b> ppm</span>"}).join("");
+ if(ext)$("chartNote").textContent=ext+" reading"+(ext>1?"s":"")+" outside the chart scale (hollow red ring) \u2014 tap it to see the value";
+ $("chart").innerHTML='<svg viewBox="0 0 '+W+" "+H+'" class="chart" role="img" aria-label="TDS trend">'+g+s+"</svg>";
 }
+$("chart").onclick=e=>{const c=e.target.closest(".hit");if(c)$("chartTip").textContent=c.dataset.tip};
+$("chartRange").onclick=e=>{const b=e.target.closest("button");if(!b)return;chartRange=b.dataset.r;$("chartRange").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));$("chartTip").textContent=TIP0;drawChart()};
+$("legend").onclick=e=>{const b=e.target.closest(".lgi");if(!b||b.classList.contains("none"))return;chartOff[b.dataset.k]=!chartOff[b.dataset.k];$("chartTip").textContent=TIP0;drawChart()};
+window.addEventListener("resize",()=>{clearTimeout(rzT);rzT=setTimeout(drawChart,150)});
 if("serviceWorker" in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})});
 function syncWhen(force){
  if(editing)return;
