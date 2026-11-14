@@ -1,6 +1,6 @@
 /* Panorama Factory Station — Shift Log · service worker (offline app shell) */
-const V = "plantlog-v11";
-const FILES = ["./", "index.html", "style.css?v=11", "app.js?v=11", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const V = "plantlog-v12";
+const FILES = ["./", "index.html", "style.css?v=12", "app.js?v=12", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

@@ -1,4 +1,5 @@
 /* Panorama Factory Station — Shift Log · app logic */
+(function(){var d=document.documentElement,sw=Math.min(screen.width,screen.height),iw=window.innerWidth;if(sw<768){d.classList.add("phone");var k=iw/sw;if(k>1.25)d.style.fontSize=(16*k)+"px"}})();
 if(window.top!==window.self){document.documentElement.style.display="none";try{window.top.location=window.self.location}catch(e){}}
 window.addEventListener("error",function(e){var b=document.getElementById("boot");if(b){b.hidden=false;b.className="card msg err";b.textContent="Page error: "+e.message}});
 const TZ="Africa/Cairo";
@@ -109,7 +110,7 @@ const KIND={ts:"start",rs:"start",te:"stop",rp:"stop",pt:"meas",ft:"meas",rt:"me
 const KICO={start:"play",stop:"stop",meas:"drop",note:"note"};
 function drawForm(){
  document.getElementById("chips").innerHTML=GROUPS.map(([g,ks])=>{const arr=ks.filter(k=>!editing||k===cur);if(!arr.length)return "";return `<div class="cgrp"><span class="cgl">${g}</span><div class="cgb">${arr.map(k=>`<button type="button" class="chip ${KIND[k]}${k===cur?" sel":""}" data-k="${k}">${TYPES[k].label}</button>`).join("")}</div></div>`}).join("");
- document.getElementById("fields").innerHTML=TYPES[cur].f.map(([id,lb,ty])=>`<label>${lb}</label><input id="f_${id}" type="${ty}" value="${editing&&editing.f&&editing.f[id]!=null?esc(editing.f[id]):""}" ${ty==="number"?'inputmode="decimal" step="any"':""}>`).join("");
+ document.getElementById("fields").innerHTML=TYPES[cur].f.map(([id,lb,ty])=>`<div class="fld"><label>${lb}</label><input id="f_${id}" type="${ty}" value="${editing&&editing.f&&editing.f[id]!=null?esc(editing.f[id]):""}" ${ty==="number"?'inputmode="decimal" step="any"':""}></div>`).join("");
  document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{cur=b.dataset.k;drawForm()});
 }
 
@@ -388,38 +389,39 @@ function drawChart(){
  const vals={L:[],R:[]},extra={L:[],R:[]};
  vis.forEach(([k])=>{const g=grp(k);pts[k].forEach(e=>vals[g].push(e.f.v));const L=limits[k]||{};[L.min,L.max].forEach(x=>{if(x!=null&&x!==""&&isFinite(+x))extra[g].push(+x)})});
  const rg={L:vals.L.length?robustRange(vals.L,extra.L):null,R:vals.R.length?robustRange(vals.R,extra.R):null};
- const W=Math.max(280,Math.min(760,$("chart").clientWidth||360)),H=Math.round(Math.max(200,Math.min(320,W*0.62)));
- const l=38,r=rg.R?44:12,t=18,b=26;
+ const u=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/16;
+ const W=Math.max(280,$("chart").clientWidth||360),H=Math.round(Math.max(250*u,Math.min(430*u,W*0.78)));
+ const l=44*u,r=(rg.R?50:14)*u,t=22*u,b=32*u;
  const all=[].concat(...vis.map(([k])=>pts[k]));
  let t0=Math.min(...all.map(e=>e.ts)),t1=Math.max(...all.map(e=>e.ts));
  if(t1-t0<3600000){t0-=1800000;t1+=1800000}
  const X=ts=>l+(ts-t0)/(t1-t0)*(W-l-r);
  const Y=(g,v)=>{const s=rg[g],c=Math.min(Math.max(v,s.lo),s.hi);return t+(1-(c-s.lo)/(s.hi-s.lo))*(H-t-b)};
- let g='<text x="2" y="11">ppm</text>';
- if(rg.R)g+='<text x="'+(W-r+5)+'" y="11" fill="#F5A524" class="ax">Feed</text>';
+ let g='<text x="2" y="'+(13*u)+'">ppm</text>';
+ if(rg.R)g+='<text x="'+(W-r+6*u)+'" y="'+(13*u)+'" fill="#F5A524" class="ax">Feed</text>';
  for(let i=0;i<=4;i++){
   const y=t+(1-i/4)*(H-t-b);
-  g+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y+'" y2="'+y+'" class="grid"/><text x="'+(l-6)+'" y="'+(y+4)+'" text-anchor="end">'+Math.round(rg.L.lo+(rg.L.hi-rg.L.lo)*i/4)+"</text>";
-  if(rg.R)g+='<text x="'+(W-r+5)+'" y="'+(y+4)+'" fill="#F5A524" class="ax">'+Math.round(rg.R.lo+(rg.R.hi-rg.R.lo)*i/4)+"</text>";
+  g+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y+'" y2="'+y+'" class="grid"/><text x="'+(l-7*u)+'" y="'+(y+4*u)+'" text-anchor="end">'+Math.round(rg.L.lo+(rg.L.hi-rg.L.lo)*i/4)+"</text>";
+  if(rg.R)g+='<text x="'+(W-r+6*u)+'" y="'+(y+4*u)+'" fill="#F5A524" class="ax">'+Math.round(rg.R.lo+(rg.R.hi-rg.R.lo)*i/4)+"</text>";
  }
  const span=t1-t0;
- for(let i=0;i<=3;i++){const ts=t0+span*i/3;g+='<text x="'+X(ts)+'" y="'+(H-8)+'" text-anchor="'+(i===0?"start":i===3?"end":"middle")+'">'+(span<=36*3600000?tOf(ts):new Date(ts).toLocaleDateString("en-US",{timeZone:TZ,month:"short",day:"numeric"}))+"</text>"}
+ for(let i=0;i<=3;i++){const ts=t0+span*i/3;g+='<text x="'+X(ts)+'" y="'+(H-9*u)+'" text-anchor="'+(i===0?"start":i===3?"end":"middle")+'">'+(span<=36*3600000?tOf(ts):new Date(ts).toLocaleDateString("en-US",{timeZone:TZ,month:"short",day:"numeric"}))+"</text>"}
  let s="",ext=0;
  vis.forEach(([k,n,c])=>{
   const gr=grp(k),sc=rg[gr],L=limits[k]||{};
-  [L.min,L.max].forEach(x=>{if(x!=null&&x!==""&&isFinite(+x))s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(gr,+x)+'" y2="'+Y(gr,+x)+'" stroke="'+c+'" stroke-dasharray="5 4" opacity=".55"/>'});
+  [L.min,L.max].forEach(x=>{if(x!=null&&x!==""&&isFinite(+x))s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(gr,+x)+'" y2="'+Y(gr,+x)+'" stroke="'+c+'" stroke-dasharray="'+(5*u)+' '+(4*u)+'" opacity=".55"/>'});
   const inn=pts[k].filter(e=>e.f.v>=sc.lo&&e.f.v<=sc.hi);
-  if(inn.length>1)s+='<polyline fill="none" stroke="'+c+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="'+inn.map(e=>X(e.ts).toFixed(1)+","+Y(gr,e.f.v).toFixed(1)).join(" ")+'"/>';
+  if(inn.length>1)s+='<polyline fill="none" stroke="'+c+'" stroke-width="'+(2.8*u)+'" stroke-linejoin="round" stroke-linecap="round" points="'+inn.map(e=>X(e.ts).toFixed(1)+","+Y(gr,e.f.v).toFixed(1)).join(" ")+'"/>';
   pts[k].forEach(e=>{
    const out=e.f.v<sc.lo||e.f.v>sc.hi,bad=lim(k,e.f.v),cx=X(e.ts).toFixed(1),cy=Y(gr,e.f.v).toFixed(1),tip=n+" \u00b7 "+e.f.v+" ppm \u00b7 "+dlab(e.ts);
    if(out)ext++;
-   s+='<circle class="pt-dot'+(out?" xt":"")+'" cx="'+cx+'" cy="'+cy+'" r="'+(out?5.5:4)+'" fill="'+(out?"none":bad?"#FF6B7A":c)+'" stroke="'+(out||bad?"#FF6B7A":"#10283A")+'" stroke-width="'+(out?2:1.5)+'"/><circle class="hit" cx="'+cx+'" cy="'+cy+'" r="13" data-tip="'+esc(tip)+'"><title>'+esc(tip)+"</title></circle>";
+   s+='<circle class="pt-dot'+(out?" xt":"")+'" cx="'+cx+'" cy="'+cy+'" r="'+((out?6:4.8)*u)+'" fill="'+(out?"none":bad?"#FF6B7A":c)+'" stroke="'+(out||bad?"#FF6B7A":"#10283A")+'" stroke-width="'+((out?2.2:1.8)*u)+'"/><circle class="hit" cx="'+cx+'" cy="'+cy+'" r="'+(15*u)+'" data-tip="'+esc(tip)+'" data-c="'+c+'"><title>'+esc(tip)+"</title></circle>";
   });
  });
  if(ext)$("chartNote").textContent=ext+" reading"+(ext>1?"s":"")+" outside the chart scale (hollow red ring) \u2014 tap it to see the value";
  $("chart").innerHTML='<svg viewBox="0 0 '+W+" "+H+'" class="chart" role="img" aria-label="TDS trend">'+g+s+"</svg>";
 }
-$("chart").onclick=e=>{const c=e.target.closest(".hit");if(c)$("chartTip").textContent=c.dataset.tip};
+$("chart").onclick=e=>{const c=e.target.closest(".hit");if(c){$("chartTip").textContent=c.dataset.tip;$("chartTip").style.borderInlineStartColor=c.dataset.c}};
 $("chartRange").onclick=e=>{const b=e.target.closest("button");if(!b)return;chartRange=b.dataset.r;$("chartRange").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));$("chartTip").textContent=TIP0;drawChart()};
 $("legend").onclick=e=>{const b=e.target.closest(".lgi");if(!b||b.classList.contains("none"))return;chartOff[b.dataset.k]=!chartOff[b.dataset.k];$("chartTip").textContent=TIP0;drawChart()};
 window.addEventListener("resize",()=>{clearTimeout(rzT);rzT=setTimeout(drawChart,150)});
